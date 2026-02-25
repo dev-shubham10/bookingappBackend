@@ -13,7 +13,7 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://bookingapp-frontend-git-main-dev-shubham10s-projects.vercel.app/"
+    "https://bookingapp-frontend-git-main-dev-shubham10s-projects.vercel.app"
   ],
   credentials: true
 })); 
