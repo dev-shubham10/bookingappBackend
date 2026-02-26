@@ -22,7 +22,7 @@ router.get('/events', async (req, res) => {
 
     return res.json(rows);
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch events' });
+    return res.status(500).json(err);
   }
 });
 
