@@ -159,5 +159,100 @@ router.post('/coupons', async (req, res) => {
   }
 });
 
+// POST /api/admin/seat-sections
+router.post('/seat-sections', async (req, res) => {
+  const { eventId, sectionName, bookingFeeType, bookingFeeValue } = req.body;
+
+  if (!eventId || !sectionName || !bookingFeeType) {
+    return res.status(400).json({
+      error: 'eventId, sectionName, and bookingFeeType are required'
+    });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    const [sectionInsert] = await connection.query(
+      `
+        INSERT INTO seat_sections (event_id, name, booking_fee_type, booking_fee_value)
+        VALUES (?, ?, ?, ?)
+      `,
+      [eventId, sectionName, bookingFeeType, bookingFeeValue || 0]
+    );
+
+    return res.status(201).json({
+      id: sectionInsert.insertId,
+      eventId,
+      sectionName,
+      bookingFeeType,
+      bookingFeeValue: bookingFeeValue || 0
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to create seat section' });
+  } finally {
+    connection.release();
+  }
+});
+
+// POST /api/admin/seats/bulk
+router.post('/seats/bulk', async (req, res) => {
+  const { eventId, sectionId, seats } = req.body;
+
+  if (!eventId || !sectionId || !Array.isArray(seats) || seats.length === 0) {
+    return res.status(400).json({
+      error: 'eventId, sectionId, and seats array are required'
+    });
+  }
+
+  // Validate seat objects
+  for (const seat of seats) {
+    if (!seat.label || seat.basePrice == null) {
+      return res.status(400).json({
+        error: 'Each seat must have label and basePrice'
+      });
+    }
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const createdSeats = [];
+    for (const seat of seats) {
+      // eslint-disable-next-line no-await-in-loop
+      const [seatInsert] = await connection.query(
+        `
+          INSERT INTO seats (event_id, section_id, seat_label, base_price)
+          VALUES (?, ?, ?, ?)
+        `,
+        [eventId, sectionId, seat.label, seat.basePrice]
+      );
+      createdSeats.push({
+        id: seatInsert.insertId,
+        label: seat.label,
+        basePrice: seat.basePrice
+      });
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      eventId,
+      sectionId,
+      count: createdSeats.length,
+      seats: createdSeats
+    });
+  } catch (err) {
+    await connection.rollback();
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Some seat labels already exist for this event' });
+    }
+    return res.status(500).json({ error: 'Failed to create seats' });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = router;
 

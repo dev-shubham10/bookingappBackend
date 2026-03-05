@@ -26,6 +26,35 @@ router.get('/events', async (req, res) => {
   }
 });
 
+// GET /api/events/:eventId/seats
+router.get('/events/:eventId/seats', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const [rows] = await pool.query(
+      `
+        SELECT
+          s.id,
+          s.seat_label AS label,
+          s.base_price AS basePrice,
+          s.status,
+          sec.id AS sectionId,
+          sec.name AS sectionName,
+          sec.booking_fee_type AS bookingFeeType,
+          sec.booking_fee_value AS bookingFeeValue
+        FROM seats s
+        JOIN seat_sections sec ON sec.id = s.section_id
+        WHERE s.event_id = ?
+        ORDER BY sec.name, s.seat_label
+      `,
+      [eventId]
+    );
+
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;
 
